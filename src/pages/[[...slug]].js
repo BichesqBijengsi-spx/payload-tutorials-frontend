@@ -1,0 +1,84 @@
+import axios from 'axios';
+import { RenderBlocks } from '@/utils/RenderBlocks'
+import React from 'react'
+
+export default function Page({page}) {
+    if (!page) {
+        return (
+            <div className="container">
+                <h1>Page not found</h1>
+                <p>Could not load page data. Please check the backend connection and logs.</p>
+            </div>
+        )
+    }
+
+    return (
+        <div>
+            <RenderBlocks layout={page.layout} />
+        </div>
+    )
+}
+
+export async function getStaticPaths() { 
+    console.log('Fetching paths from:', process.env.NEXT_PUBLIC_PAYLOAD_URL);
+    try {
+        const pageReq = await axios(`${process.env.NEXT_PUBLIC_PAYLOAD_URL}/api/pages?limit=100`)
+        const pageData = pageReq.data;
+
+        const paths = pageData.docs.map(({ slug, id }) => ({
+            params: {
+                slug: slug !== 'index' ? slug.split('/') : [],
+            },
+        }))
+
+        return {
+            paths,
+            fallback: false,
+        }
+    } catch (error) {
+        console.error('Error fetching paths:', error.message, error.response?.status);
+        return {
+            paths: [],
+            fallback: false,
+        }
+    }
+}
+
+export async function getStaticProps({params}) {
+    const slug = params?.slug ? params.slug.join('/') : 'index';
+
+    try {
+        // fetch page
+        const pageReq = await axios(`${process.env.NEXT_PUBLIC_PAYLOAD_URL}/api/pages?where[slug][equals]=${slug}`);
+        const pageData = pageReq.data.docs[0];
+
+        return {
+            props: {
+                page: pageData || null,
+            },
+        }
+    } catch (error) {
+        console.error('Error in getStaticProps:', error.message, error.response?.status);
+        return {
+            props: {
+                page: null,
+            },
+        }
+    }
+}
+
+
+// export async function getStaticProps (ctx) { 
+//     const slug = ctx.params?.slug || 'index';
+//     const preview = ctx.preview || false;
+
+//     // fetch page
+//     const pageReq = await axios(`api/pages?where[slug][equals]=${slug}`);
+//     const pageData = pageReq.data.docs[0];
+
+//     return {
+//         props: {
+//             page: pageData,
+//         },
+//     }
+// }

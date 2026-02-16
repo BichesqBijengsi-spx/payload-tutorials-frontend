@@ -1,0 +1,33 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 # Configure this to match your var.aws_region
+
+      - name: Deploy via SSM
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Project,Values=PayloadCMS" \
+            --parameters commands='[
+              "export PATH=$PATH:/usr/bin:/usr/local/bin",
+              "export NVM_DIR=\"$HOME/.nvm\"",
+              "[ -s \"$NVM_DIR/nvm.sh\" ] && \. \"$NVM_DIR/nvm.sh\"",
+              "cd /home/ubuntu/payload-tutorials-frontend || exit 1",
+              "git pull",
+              "pnpm install",
+              "pnpm build",
+              "pm2 restart next-frontend || pm2 start npm --name next-frontend -- start"
+            ]' \
+            --comment "Deploying Frontend"
