@@ -46,29 +46,37 @@ jobs:
 
       - name: Deploy to EC2 via SSM
         run: |
-          COMMANDS="
-            echo 'Logging into GHCR...'
-            echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          # Define the deployment script explicitly
+          # Using a heredoc with EOT to avoid quote escaping issues
+          COMMANDS=$(cat <<EOT
+          echo 'Logging into GHCR...'
+          echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
-            echo 'Pulling new image...'
-            docker pull ${{ env.IMAGE_NAME }}
+          echo 'Pulling new image...'
+          docker pull ${{ env.IMAGE_NAME }}
             
-            echo 'Stopping old container...'
-            docker stop ${{ env.CONTAINER_NAME }} || true
-            docker rm ${{ env.CONTAINER_NAME }} || true
+          echo 'Stopping old container...'
+          docker stop ${{ env.CONTAINER_NAME }} || true
+          docker rm ${{ env.CONTAINER_NAME }} || true
             
-            echo 'Running new container...'
-            # Note: Mapping to port 3001 to avoid conflict with backend on 3000
-            docker run -d \
-              -p 3001:3000 \
-              --name ${{ env.CONTAINER_NAME }} \
-              --restart unless-stopped \
-              -e NEXT_PUBLIC_BACKEND_URL=http://localhost:3000 \
-              ${{ env.IMAGE_NAME }}
-          "
+          echo 'Running new container...'
+          # Note: Mapping to port 3001 to avoid conflict with backend on 3000
+          docker run -d \
+            -p 3001:3000 \
+            --name ${{ env.CONTAINER_NAME }} \
+            --restart unless-stopped \
+            -e NEXT_PUBLIC_BACKEND_URL=http://localhost:3000 \
+            ${{ env.IMAGE_NAME }}
+          EOT
+          )
           
+          # Use jq to robustly generate the JSON payload for commands
+          # This handles newlines and quotes inside the script correctly
+          PARAMS=$(jq -n --arg cmd "$COMMANDS" '{"commands": [$cmd]}')
+          
+          # Send the command
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=tag:Deployment,Values=PayloadCMS" \
-            --parameters commands="$COMMANDS" \
+            --parameters "$PARAMS" \
             --comment "Deploying Frontend via GitHub Actions"
