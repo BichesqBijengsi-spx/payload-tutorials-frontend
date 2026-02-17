@@ -4,30 +4,68 @@ on:
   push:
     branches: [ "main" ]
 
+permissions:
+  id-token: write   # Required for requesting the JWT
+  contents: read    # Required for actions/checkout
+  packages: write   # Required to push to GHCR
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/payload-tutorials-frontend:latest
+  CONTAINER_NAME: payload-frontend
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./payload-tutorials-frontend
+          push: true
+          tags: ${{ env.IMAGE_NAME }}
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1 # Configure this to match your var.aws_region
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Deploy via SSM
+      - name: Deploy to EC2 via SSM
         run: |
+          COMMANDS="
+            echo 'Logging into GHCR...'
+            echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            echo 'Pulling new image...'
+            docker pull ${{ env.IMAGE_NAME }}
+            
+            echo 'Stopping old container...'
+            docker stop ${{ env.CONTAINER_NAME }} || true
+            docker rm ${{ env.CONTAINER_NAME }} || true
+            
+            echo 'Running new container...'
+            # Note: Mapping to port 3001 to avoid conflict with backend on 3000
+            docker run -d \
+              -p 3001:3000 \
+              --name ${{ env.CONTAINER_NAME }} \
+              --restart unless-stopped \
+              -e NEXT_PUBLIC_BACKEND_URL=http://localhost:3000 \
+              ${{ env.IMAGE_NAME }}
+          "
+          
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Project,Values=PayloadCMS" \
-            --parameters commands='[
-              "export PATH=$PATH:/usr/bin:/usr/local/bin",
-              "export NVM_DIR=\"$HOME/.nvm\"",
-              "[ -s \"$NVM_DIR/nvm.sh\" ] && \. \"$NVM_DIR/nvm.sh\"",
-              "cd /home/ubuntu/payload-tutorials-frontend || exit 1",
-              "git pull",
-              "pnpm install",
-              "pnpm build",
-              "pm2 restart next-frontend || pm2 start npm --name next-frontend -- start"
-            ]' \
-            --comment "Deploying Frontend"
+            --targets "Key=tag:Deployment,Values=PayloadCMS" \
+            --parameters commands="$COMMANDS" \
+            --comment "Deploying Frontend via GitHub Actions"
