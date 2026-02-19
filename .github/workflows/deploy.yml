@@ -75,8 +75,38 @@ jobs:
           PARAMS=$(jq -n --arg cmd "$COMMANDS" '{"commands": [$cmd]}')
           
           # Send the command
-          aws ssm send-command \
+          # Send the command and capture the Command ID
+          COMMAND_ID=$(aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=tag:Deployment,Values=PayloadCMS" \
             --parameters "$PARAMS" \
-            --comment "Deploying Frontend via GitHub Actions"
+            --comment "Deploying Frontend via GitHub Actions" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "Command ID: $COMMAND_ID"
+
+          # Wait for the command to complete
+          STATUS="Pending"
+          while [[ "$STATUS" == "Pending" || "$STATUS" == "InProgress" ]]; do
+            sleep 5
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id "$COMMAND_ID" \
+              --details \
+              --query "CommandInvocations[0].Status" \
+              --output text)
+            echo "Status: $STATUS"
+          done
+
+          # Get the full output (stdout and stderr)
+          echo "Instance Output:"
+          aws ssm list-command-invocations \
+            --command-id "$COMMAND_ID" \
+            --details \
+            --query "CommandInvocations[0].CommandPlugins[0].Output" \
+            --output text
+
+          if [[ "$STATUS" != "Success" ]]; then
+            echo "Deployment failed!"
+            exit 1
+          fi
