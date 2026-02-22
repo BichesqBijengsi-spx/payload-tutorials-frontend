@@ -1,0 +1,52 @@
+name: Deploy Frontend (Debug)
+
+on:
+  workflow_dispatch:  # Manual trigger for testing
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  CONTAINER_NAME: payload-frontend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check SSM Connectivity
+        run: |
+          echo "=== Checking for EC2 instances with PayloadCMS tag ==="
+          aws ssm describe-instance-information \
+            --filters "Key=tag:Deployment,Values=PayloadCMS" \
+            --query "InstanceInformationList[*].[InstanceId,PingStatus,PlatformName]" \
+            --output table
+
+      - name: Test SSM Command
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Deployment,Values=PayloadCMS" \
+            --parameters '{"commands":["docker ps","docker images"]}' \
+            --query "Command.CommandId" \
+            --output text)
+          
+          echo "Command ID: $COMMAND_ID"
+          sleep 10
+          
+          aws ssm list-command-invocations \
+            --command-id "$COMMAND_ID" \
+            --details \
+            --query "CommandInvocations[0].CommandPlugins[0].Output" \
+            --output text
