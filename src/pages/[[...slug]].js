@@ -22,7 +22,9 @@ export default function Page({page}) {
 export async function getStaticPaths() { 
     console.log('Fetching paths from:', process.env.NEXT_PUBLIC_PAYLOAD_URL);
     try {
-        const pageReq = await axios(`${process.env.NEXT_PUBLIC_PAYLOAD_URL}/api/pages?limit=100`)
+        const pageReq = await axios(
+          `${process.env.NEXT_PUBLIC_PAYLOAD_URL}/api/pages?limit=100&depth=1`,
+        );
         const pageData = pageReq.data;
 
         const paths = pageData.docs.map(({ slug, id }) => ({
@@ -49,14 +51,17 @@ export async function getStaticProps({params}) {
 
     try {
         // fetch page
-        const pageReq = await axios(`${process.env.NEXT_PUBLIC_PAYLOAD_URL}/api/pages?where[slug][equals]=${slug}`);
+        const pageReq = await axios(
+          `${process.env.NEXT_PUBLIC_PAYLOAD_URL}/api/pages?where[slug][equals]=${slug}&limit=1&depth=10`,
+        );
         const pageData = pageReq.data.docs[0];
 
         return {
-            props: {
-                page: pageData || null,
-            },
-        }
+          props: {
+            page: pageData || null,
+            revalidate: 300, // 5min ISR
+          },
+        };
     } catch (error) {
         console.error('Error in getStaticProps:', error.message, error.response?.status);
         return {
