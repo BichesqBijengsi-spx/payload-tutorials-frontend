@@ -5,7 +5,9 @@ export default function Hero({heading, text, backgroundImage}) {
         <div>
             <h1>{heading}</h1> 
             <p>{text}</p>
-            <img src={backgroundImage.url} alt={backgroundImage.alt} />
+            {backgroundImage?.url && (
+                <img src={backgroundImage.url} alt={backgroundImage.alt || 'background'} />
+            )}
         </div>
     )
 }
