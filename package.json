@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "clean": "rd /s /q .next",
+    "clean:modules": "rd /s /q node_modules",
+    "clean:cache": "npm cache clean --force",
     "build": "next build",
     "start": "next start"
   },
