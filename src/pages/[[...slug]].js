@@ -13,10 +13,10 @@ export default function Page({page}) {
     }
 
     return (
-        <div>
-            <RenderBlocks layout={page.layout} />
-        </div>
-    )
+      <div>
+        <RenderBlocks layout={page?.layout || []} />
+      </div>
+    );
 }
 
 export async function getStaticPaths() { 
