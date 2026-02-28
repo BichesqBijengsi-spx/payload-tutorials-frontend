@@ -1,8 +1,8 @@
 import React from 'react'
 
-export default function Hero({ title, text, backgroundImage }) {
+export default function Hero({ title, text, backgroundImage, primaryButtonLabel, secondaryButtonLabel }) {
     // Debug log to see exactly what data we're getting
-    console.log('Hero block data:', { title, text, backgroundImage });
+    console.log('Hero block data:', { title, text, backgroundImage, primaryButtonLabel, secondaryButtonLabel });
 
     let bgUrl = null;
     
@@ -54,10 +54,10 @@ export default function Hero({ title, text, backgroundImage }) {
                 {/* CTA Buttons */}
                 <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500">
                     <button className="px-10 py-4 bg-white text-black font-bold rounded-full hover:bg-gray-100 transition-all transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.3)] cursor-pointer">
-                        Apply
+                        {primaryButtonLabel || 'Apply'}
                     </button>
                     <button className="px-10 py-4 border-2 border-white text-white font-bold rounded-full hover:bg-white/10 transition-all transform hover:scale-105 active:scale-95 backdrop-blur-sm cursor-pointer">
-                        Donate
+                        {secondaryButtonLabel || 'Donate'}
                     </button>
                 </div>
             </div>
