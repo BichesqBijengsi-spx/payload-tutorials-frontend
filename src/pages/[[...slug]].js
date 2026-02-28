@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { RenderBlocks } from '@/utils/RenderBlocks'
 import React from 'react'
+import Navbar from '@/blocks/navbar'
 
-export default function Page({page}) {
+export default function Page({page, header}) {
     if (!page) {
         return (
             <div className="container">
@@ -14,7 +15,10 @@ export default function Page({page}) {
 
     return (
       <div>
-        <RenderBlocks layout={page?.layout || []} />
+        <Navbar {...header} />
+        <main>
+            <RenderBlocks layout={page?.layout || []} />
+        </main>
       </div>
     );
 }
@@ -56,9 +60,16 @@ export async function getStaticProps({params}) {
         );
         const pageData = pageReq.data.docs[0];
 
+        // fetch header
+        const headerReq = await axios(
+          `${process.env.NEXT_PUBLIC_PAYLOAD_URL}/api/globals/header?depth=2`,
+        );
+        const headerData = headerReq.data;
+
         return {
           props: {
             page: pageData || null,
+            header: headerData || null,
             revalidate: 300, // 5min ISR
           },
         };
@@ -67,7 +78,9 @@ export async function getStaticProps({params}) {
         return {
             props: {
                 page: null,
+                header: null,
             },
+            revalidate: 60, // Retry sooner on error
         }
     }
 }
